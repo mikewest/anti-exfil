@@ -32,12 +32,13 @@ parameters as we discover required extension points, though it doesn't seem
 that we need any to start with. For example:
 
 ```http
-Request-Policy: (response-origin "https://*.site.example" "https://cdn.example")
+Request-Policy: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z]+)")
 ```
 
 This policy would allow requests and connections to the origin of the server
-which delivered the response, the specific CDN listed, and any subdomain of
-`site.example`. URLPattern allows quite a bit of flexibility that we can reuse
+which delivered the response, the specific CDN listed, any subdomain of
+`site.example`, and any subdomain of any host whose penultimate DNS label is
+`site`. URLPattern allows quite a bit of flexibility that we can reuse
 here rather than inventing a new approach (or reusing a more limited grammar
 from something like CSP).
 
