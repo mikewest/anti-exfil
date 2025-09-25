@@ -32,7 +32,7 @@ parameters as we discover required extension points, though it doesn't seem
 that we need any to start with. For example:
 
 ```http
-Request-Policy: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\-]+)")
+Request-Policy: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\\-]+)")
 ```
 
 This policy would allow requests and connections to the origin of the server
