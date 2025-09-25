@@ -60,8 +60,10 @@ client-side attacks and/or misconfigurations:
 *   A document's (or worker's) asserted policy governs only requests initiated
     by _that_ context. If a framed document asserts a distinct policy, so be
     it (with the caveat that we'll likely inherit this policy into contexts
-    created via local schemes (`data:`, `about:`, etc.), similar to other components of a context's
-    [policy container](https://html.spec.whatwg.org/multipage/browsers.html#policy-containers)).
+    created via local schemes (`data:`, `about:`, etc.), similar to other
+    components of a context's
+    [policy container](https://html.spec.whatwg.org/multipage/browsers.html#policy-containers))
+    which are handled by HTML when creating new document/worker contexts.
     
 *   The connection and/or request are the threat the proposal aims to defend
     against. To be effective as an exfiltration defense, we must block
@@ -95,3 +97,92 @@ client-side attacks and/or misconfigurations:
     responses as match failures. That is, we'll start with a draconian policy
     which will block any redirect response. It's quite possible we'll shift
     this one way or another as use cases crystalize.
+
+
+Questions
+---------
+
+### Why build this when we already have Content Security Policy? ###
+
+Three reasons:
+
+1.  CSP's model is too granular: Developers who wish to mitigate the risk that data flows out
+    of a sensitive context require a protection that exhaustively covers the possible
+    ways in which requests can be made or connections established. CSP's categorization
+    of requests into types which can be controlled in isolation is the wrong way to
+    approach this problem, as data leaking through a request for a web font is just as
+    bad as data leaking through a request for an image or a script. Distinguishing these
+    request types complicates the process of designing a reasonable defense with questions
+    that are simply irrelevant.
+
+2.  CSP's syntax is not granular enough: The `host-source` grammar CSP supports leads to truly
+    verbose headers being delivered with responses. A distinct policy provides the opportunity
+    to shift to the URLPattern syntax which will resolve some complaints folks have raised about
+    CSP's approach by providing a more modern, malleable, and standardized matching syntax.
+
+3.  CSP's coverage is incomplete: While CSP does a good job covering HTTP requests which run
+    through Fetch, it does not exhaustively cover the myriad ways in which web platform APIs
+    allow connections to be established. DNS prefetch and WebRTC are good examples to start
+    with, but there are many others which have struggled with exactly how they fit into CSP's
+    threat model. By creating a new policy with a narrow focus and explicit promise to developers,
+    these discussions will have a defensible answer and a clear mandate to specification authors.
+
+
+### How does this policy interact with other mechanisms of controlling outgoing requests? ###
+
+In short, we should follow CSP's model for resolving multiple policies: each should take effect,
+and connections will only be established if they pass all of the applicable policies. That is, a
+response containing the following headers:
+
+```http
+Content-Security-Policy: default-src https://good.example/ https://sketchy.example/
+Connection-Allowlist: ("https://good.example/")
+```
+
+requests to `https://good.example/` would pass both policies, while requests to
+`https://sketchy.example/` would be blocked, as they wouldn't match the `Connection-Allowlist`.
+
+
+### We probably need a report-only variant of this policy, don't we? ###
+
+Of course. That's been a critical part of real-world policy deployments, and we'll need it here too.
+
+
+### What about navigation? ###
+
+Navigation (of the current context or any other to which a handle can be obtained) is clearly in-scope
+for exfiltration mitigation. In certain contexts, it will be straightforward to list all the possible
+places to which navigation is expected, and the current proposal will handle those situations well.
+In other situations, endpoints might be harder to determine. OAuth flows, payment flows, etc. might hop
+around in ways which are difficult to predict.
+
+It's potentially necessary for us to split navigation requests out from the rest, possibly by allowing
+developers to set broad expectations for them via a property on the list
+(e.g. `(...);allow-navigation={same-origin,same-site,cross-origin}`)? Feedback on use cases here would
+be quite helpful.
+
+
+### You're going to have to rethink a ban on redirects. ###
+
+Probably, yes. I want to simplify the initial proposal so we can start talking about it, but I do
+anticipate redirects being required one way or the other for real-world deployments. I think we have
+a few realistic options:
+
+1.  Apply the allowlist to every hop of a redirect chain. This has the advantage of matching CSP's
+    behavior that developers are already familiar with. It _is_ a cross-origin data leak insofar as it
+    provides insight about another origin's decisions, which is unfortunate but perhaps unavoidable.
+
+2.  Allow _a specific rule_'s redirect chain to arbitrarily redirect. This narrows the concerns
+    above by forcing developers to annotate the allowlist with their expectations. It might be perfectly
+    acceptable for `https://trusted.example/` to redirect users to arbitrary locations, while other
+    endpoints are expected to remain put. Annotating list items should make this kind of distinction
+    possible if necessary (e.g. `("https://trusted.example/";redirection-allowed "https://less-so.example/")`).
+
+3.  Narrow the above by allowing _a specific rule_ to redirect so long as the targets match the allowlist.
+    This creates less opportunity for unexpected connection than 1 or 2 by requiring developers to annotate
+    the specific rules which can redirect, but would do so in a way that's less broad (e.g.
+    `("https://semi-trusted.example/";redirection-allowed=within-allowlist ...)).
+
+We could add more options as well. CSP's earlier `navigate-to` proposal distinguished between intermediate
+redirects and the final, non-redirect response. You could imagine adding those kinds of options either to
+the entire allowlist or individual rules. Feedback here as well would be much appreciated.
