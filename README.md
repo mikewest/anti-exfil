@@ -1,5 +1,5 @@
-Request Policy
-==============
+Connection Allowlists
+=====================
 
 Developers wish to have control over the resources loaded into their pages'
 contexts and the endpoints to which their pages can make requests. This control
@@ -32,7 +32,7 @@ parameters as we discover required extension points, though it doesn't seem
 that we need any to start with. For example:
 
 ```http
-Request-Policy: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\\-]+)")
+Connection-Allowlist: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\\-]+)")
 ```
 
 This policy would allow requests and connections to the origin of the server
@@ -59,8 +59,10 @@ client-side attacks and/or misconfigurations:
 
 *   A document's (or worker's) asserted policy governs only requests initiated
     by _that_ context. If a framed document asserts a distinct policy, so be
-    it.
-
+    it (with the caveat that we'll likely inherit this policy into contexts
+    created via local schemes (`data:`, `about:`, etc.), similar to other components of a context's
+    [policy container](https://html.spec.whatwg.org/multipage/browsers.html#policy-containers)).
+    
 *   The connection and/or request are the threat the proposal aims to defend
     against. To be effective as an exfiltration defense, we must block
     connections before they're made.
@@ -90,5 +92,6 @@ client-side attacks and/or misconfigurations:
     behavior around redirects is both a leak in itself, and has garnered
     inconsistently favorable feedback from developers and researchers alike.
     For simplicity's sake, this proposal will generally treat redirect
-    responses as match failures. It's quite possible we'll shift this one way
-    or another as use cases crystalize.
+    responses as match failures. That is, we'll start with a draconian policy
+    which will block any redirect response. It's quite possible we'll shift
+    this one way or another as use cases crystalize.
