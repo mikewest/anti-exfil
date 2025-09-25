@@ -25,9 +25,10 @@ response header, along with some configuration metadata. Before establishing
 a connection on behalf of a page, the user agent will consult this list of
 endpoints, and block the connection before it's made if there's a mismatch.
 
-One syntax which seems sufficient would be a Structured Field list of Strings,
-each matching the `URLPattern` syntax for absolute URLs, or the token
-"response-origin". This list could be annotated with a small number of
+One syntax which seems sufficient would be a Structured Field parsed as a
+List with one element: an Inner List whose elements are either the Token
+`response-origin`, or Strings matching the `URLPattern` syntax for
+absolute URLs. This Inner List could be annotated with a small number of
 parameters as we discover required extension points. Reporting, for example.
 That is:
 
@@ -189,3 +190,10 @@ a few realistic options:
 We could add more options as well. CSP's earlier `navigate-to` proposal distinguished between intermediate
 redirects and the final, non-redirect response. You could imagine adding those kinds of options either to
 the entire allowlist or individual rules. Feedback here as well would be much appreciated.
+
+
+### Could we spell this differently? ###
+
+Of course! It could be a dictionary (`allowlist=("a" "b" "c"), report-to=ReportingAPIEndpointGoesHere`)!
+It could be multiple headers! It could be a new CSP directive! The spelling above seems reasonable to me,
+but feedback on different approaches is welcome!
