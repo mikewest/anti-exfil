@@ -28,11 +28,11 @@ endpoints, and block the connection before it's made if there's a mismatch.
 One syntax which seems sufficient would be a Structured Field list of Strings,
 each matching the `URLPattern` syntax for absolute URLs, or the token
 "response-origin". This list could be annotated with a small number of
-parameters as we discover required extension points, though it doesn't seem
-that we need any to start with. For example:
+parameters as we discover required extension points. Reporting, for example.
+That is:
 
 ```http
-Connection-Allowlist: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\\-]+)")
+Connection-Allowlist: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\\-]+)"); report-to=ReportingAPIEndpointNameGoesHere
 ```
 
 This policy would allow requests and connections to the origin of the server
@@ -44,7 +44,9 @@ from something like CSP).
 
 To effectuate blocking connections, we'd add a check against this list to
 Fetch, and to the more esoteric specifications partially listed above. If the
-connection endpoint doesn't match the list, we'll block it.
+connection endpoint doesn't match the list, we'll block it, and report metadata
+about the violation to the Reporting API endpoint named
+`ReportingAPIEndpointNameGoesHere`.
 
 That's it.
 
