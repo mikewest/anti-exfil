@@ -43,7 +43,8 @@ here rather than inventing a new approach (or reusing a more limited grammar
 from something like CSP).
 
 To effectuate blocking connections, we'd add a check against this list to
-Fetch, and to the more esoteric specifications partially listed above.
+Fetch, and to the more esoteric specifications partially listed above. If the
+connection endpoint doesn't match the list, we'll block it.
 
 That's it.
 
