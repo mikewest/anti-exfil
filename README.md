@@ -151,7 +151,11 @@ requests to `https://good.example/` would pass both policies, while requests to
 
 ### We probably need a report-only variant of this policy, don't we? ###
 
-Of course. That's been a critical part of real-world policy deployments, and we'll need it here too.
+Of course. That's been a critical part of real-world policy deployments, and we'll need it here too:
+
+```http
+Connection-Allowlist-Report-Only: (response-origin "https://*.site.example" "https://cdn.example" "https://*.site.([a-z\\-]+)"); report-to=ReportingAPIEndpointNameGoesHere
+```
 
 
 ### What about navigation? ###
