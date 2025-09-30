@@ -100,7 +100,9 @@ client-side attacks and/or misconfigurations:
     For simplicity's sake, this proposal will generally treat redirect
     responses as match failures. That is, we'll start with a draconian policy
     which will block any redirect response. It's quite possible we'll shift
-    this one way or another as use cases crystalize.
+    this one way or another as use cases crystalize (see the section entitled
+    "[You're going to have to rethink a ban on redirects.](#youre-going-to-have-to-rethink-a-ban-on-redirects)"
+    below).
 
 
 Questions
