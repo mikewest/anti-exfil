@@ -1,0 +1,226 @@
+<pre class='metadata'>
+Title: Connection Allowlists
+Shortname: connection-allowlists
+Level: 1
+Status: UD
+Group: WICG
+Repository: wicg/connection-allowlists
+URL: https://wicg.github.io/connection-allowlists/
+Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
+Editor: Mike West, Google
+Abstract:
+  The `Connection-Allowlist` mechanism provides a concise policy language and delivery mechanism
+  for a set of constraints on a context's ability to communicate with other servers. The goal is
+  to provide developers with the ability to holistically mitigate explicit exfiltration channels
+  in a way that's narrowly tailored to suit the problem.
+Complain About: accidental-2119 yes, missing-example-ids yes
+Markup Shorthands: markdown yes, css no
+</pre>
+<pre class="anchors">
+urlPrefix: https://www.rfc-editor.org/rfc/rfc9651; spec: RFC9651
+    type: dfn
+        text: structured header; url: #name-introduction
+        for: structured header
+            text: token; url: #name-tokens
+            text: list; url: #name-list
+            text: string; url: #name-string
+            text: inner list; url: #name-inner-list
+            text: dictionary; url: #name-dictionary
+            text: parameters; url: #name-parameters
+    type: abstract-op
+        text: parsing structured fields; url: text-parse
+</pre>
+<pre class="link-defaults">
+spec:html; type:dfn; for:/; text:policy container
+spec:fetch; type:method; text:fetch(input)
+spec:infra; type:dfn; for:/; text:list
+spec:infra; type:dfn; for:/; text:string
+spec:url; type:dfn; for:/; text:url
+</pre>
+
+Introduction {#intro}
+=====================
+
+Developers wish to have control over the resources loaded into their pages' contexts and the
+endpoints to which their pages can make requests. This control is necessary for several purposes,
+including limiting the ways in which users' data can flow through the user agent (mitigating
+exfiltration attacks) and ensuring control over a site's architecture and depedencies.
+
+Content Security Policy addresses some of this need, but does so in a way that is more granular
+than necessary for the most critical use cases, and with a syntax and grammar that's complicated
+by the other protections CSP is used to deploy. [[CSP]]
+
+[:Connection-Allowlist:] steps back from CSP, and focuses on the single use case of controlling
+the explicit requests a page may initiate through Fetch and other web platform APIs (WebRTC, Web
+Transport, FedCM, Web Payments, DNS Prefetch, etc) in a way that aims to be straightforward and
+comprehensive.
+
+<div class="example" id="example-basic">
+  ```http
+    NOTE: '\' line wrapping per RFC 8792
+
+    Connection-Allowlist: (response-origin "https://cdn.example" "https://*.example.:tld" \
+                           "https://api.example:*"); report-to=ReportingAPIEndpoint
+  ```
+
+  This header, delivered along with a document to which a user has navigated, would restrict that
+  document to allow requests and connections only to those endpoints which matched the URL patterns
+  [[URLPATTERN]] specified in the list: the origin from which the document was delivered,
+  `https://cdn.example`, ny subdomain of any host whose penultimate DNS label is `example`,
+  `https://api.example` on any port, and so on.
+
+  Attempts to connect to endpoints that don't match the allowlist will be blocked, and reported via
+  a Reporting API [[REPORTING]] [=endpoint=] specified in the `report-to` parameter (and defined
+  through a separate [=Reporting-Endpoints=] header).
+</div>
+
+Threat Model {#threat-model}
+------------
+
+This proposal is intentionally small, targeting a specific but useful niche of client-side attacks
+and/or misconfigurations:
+
+*   Policies for documents and workers will be asserted by servers as HTTP response headers. This
+    means that attackers who can manipulate response headers will remain out of scope.
+
+*   A document's (or worker's) asserted policy governs only requests initiated by _that_ context.
+    If a framed document asserts a distinct policy, so be it (with the caveat that this policy
+    will apply to contexts created via local schemes (`data:`, `about:`, etc.), similar to other
+    components of a context's [=/policy container=], which are handled by HTML when creating new
+    document/worker contexts.
+    
+*   The connection and/or request are the threat the proposal aims to defend against. To be
+    effective as an exfiltration defense, we must block connections before they're made.
+
+*   There are a plethora of side-channels available as unintended effects of otherwise-excellent
+    web platform APIs. This proposal does not attempt to address them, focusing instead soley on
+    those requests or connections explicitly initiated by the user agent on a page's behalf. This
+    certainly includes the clear cases of {{fetch(input)|fetch()}} and {{XMLHttpRequest}}, along with resource
+    requests generally. It also includes network connections established through channels that are
+    less explicitly "requests": manifests fetched through the Web Install API, connections to
+    TURN/STUN servers via WebRTC, Web Transport channels, navigations, and so on. These are all in
+    scope, while more esoteric channels like memory or CPU consumption, socket exhaustion, and
+    XSLeaks in general are not.
+
+*   This proposal addresses only communication channels. It does not aim to prevent (or even
+    substantially mitigate) threats like content injection or cross-site scripting. It only can
+    constrain the impact of such an attack _on those specific pages_ where the policy is in place,
+    and should be considered only as one layer in a page's defenses; it won't be sufficient in
+    itself.
+
+*   It's tempting to attempt to defend against a subset of server-side threats, like open redirects.
+    It's possible that we could do so in a proposal like this one, similar conceptually to what CSP
+    does today. That said, CSP's behavior around redirects is both a leak in itself, and has
+    garnered inconsistently favorable feedback from developers and researchers alike. For
+    simplicity's sake, this proposal will generally treat redirect responses as match failures. That
+    is, we'll start with a draconian policy which will block any redirect response. It's quite
+    probable that we'll shift this one way or another as use cases crystalize.
+
+
+Overlap with Content Security Policy {#overlap-with-csp}
+------------------------------------
+
+This proposal has a lot in common with Content Security Policy's approach to restrictions upon
+resource usage within a given context, [=Fetch directives=] in particular. Still, it seems
+reasonable to explore for a few reasons:
+
+1.  CSP's model is too granular: Developers who wish to mitigate the risk that data flows out of a
+    sensitive context require a protection that exhaustively covers the possible ways in which
+    requests can be made or connections established. CSP's categorization of requests into types
+    which can be controlled in isolation is the wrong way to approach this problem, as data leaking
+    through a request for a web font is just as bad as data leaking through a request for an image
+    or a script. Distinguishing these request types complicates the process of designing a
+    reasonable defense with questions that are simply irrelevant.
+
+2.  CSP's syntax is not granular enough: The <a grammar>`host-source`</a> grammar CSP supports leads
+    to truly verbose headers being delivered with responses. A distinct policy provides the
+    opportunity to shift to the URLPattern syntax which will resolve some complaints folks have
+    raised about CSP's approach by providing a more modern, malleable, and standardized matching
+    syntax.
+
+3.  CSP's coverage is incomplete: While CSP does a good job covering HTTP requests which run
+    through Fetch, it does not exhaustively cover the myriad ways in which web platform APIs
+    allow connections to be established. DNS prefetch and WebRTC are good examples to start
+    with, but there are many others which have struggled with exactly how they fit into CSP's
+    threat model. By creating a new policy with a narrow focus and explicit promise to developers,
+    these discussions will have a defensible answer and a clear mandate to specification authors.
+
+Connection Allowlists {#allowlists}
+=====================
+
+A <dfn>Connection Allowlist</dfn> represents the set of [=URL patterns=] to which a given context
+is allowed to connect. It is a [=struct=] with the following [=struct/items=]:
+
+*   <dfn for="Connection Allowlist">allowlist</dfn>, which is a [=list=] of [=URL patterns=]. It is
+    an empty list unless otherwise specified.
+*   <dfn for="Connection Allowlist">report-to</dfn>, which is either `null` or a Reporting API
+    [=endpoint=]. It is `null` unless otherwise specified.
+*   <dfn for="Connection Allowlist">disposition</dfn>, which is either "`enforce`" or "`report`".
+
+
+The `Connection-Allowlist` Header {#header}
+=================================
+
+The <dfn http-header export>Connection-Allowlist</dfn> response [=header=] contains a list of
+serialized URL pattern strings that define the set of endpoints to which a context is allowed to
+connect.
+
+It is a [=structured header=] whose value is a [=structured header/list=]. This list contains a
+single item whose value is an [=structured header/inner list=] of URL patterns serialized as
+[=structured header/strings=] or the [=structured header/token=]
+[=Connection-Allowlist/response-origin=]. The inner list may have a
+[=Connection-Allowlist/report-to=] [=structured header/parameter=] whose value is a
+[=structured header/token=] representing a Reporting API [=endpoint=].
+
+<div algorithm>
+To <dfn abstract-op>parse a Connection Allowlist header</dfn> given a [=header=] (|header|),
+a [=URL=] (|response-url|), and a [=Connection Allowlist/disposition=] (|disposition|), execute
+the following steps:
+
+1.  Let |parsed| be the result of [$parsing structured fields$] with `input_string`
+    set to |header|'s [=header/value=], and `header_type` set to
+    "<a for="structured header">`list`</a>".
+
+2.  If |parsed| is `null`, or if |parsed|'s [=list/size=] is 0, return `null`.
+
+3.  If |parsed|[0] is not a [=list=], return `null`.
+
+4.  Let |allowlist| be a [=Connection Allowlist=] whose [=Connection Allowlist/disposition=] is
+    |disposition|.
+
+5.  [=list/iterate|For each=] |item| in |parsed|[0]:
+
+    1.  Let |pattern| be `null`.
+
+    2.  If |item| is the [=structured header/token=] <a grammar>`response-origin`</a>:
+
+        1.  Set |pattern| to the [=ASCII serialization of an origin|ASCII serialization=] of
+            |response-url|'s [=url/origin=].
+
+    3.  If |item| is a [=string=], set |pattern| to |item|.
+
+    4.  If |pattern| is `null`, [=continue=].
+
+        Note: We're skipping over any invalid input here. We could plausibly be more draconian in
+        our parsing, but that likely limits our future flexibility.
+
+    5.  [=URL pattern/Create=] a URL pattern given |item| as the input, `null` as the base URL, and
+        an empty dictionary as the options, and |append| it to |allowlist|'s
+        [=Connection Allowlist/allowlist=].
+
+        If this step throws an error, [=continue=].
+
+6.  [=list/iterate|For each=] |key| → |value| in |parsed|[0]'s [=structured header|parameters=]:
+
+    1.  If |key| is <a grammar>report-to`</a> and |value| is a [=structured header/token=],
+        set |allowlist|'s [=Connection Allowlist/report-to=] to |value|.
+
+        Note: Again, we'll simply ignore any invalid input to leave room for the future.
+         
+7.  Return |allowlist|.
+
+</div>
+
+
+<dfn grammar>response-origin</dfn>
+<dfn grammar>report-to</dfn>
