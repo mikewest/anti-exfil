@@ -6,7 +6,6 @@ Status: UD
 Group: WICG
 Repository: wicg/connection-allowlists
 URL: https://wicg.github.io/connection-allowlists/
-Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
 Editor: Mike West, Google
 Abstract:
   The `Connection-Allowlist` mechanism provides a concise policy language and delivery mechanism
@@ -29,13 +28,25 @@ urlPrefix: https://www.rfc-editor.org/rfc/rfc9651; spec: RFC9651
             text: parameters; url: #name-parameters
     type: abstract-op
         text: parsing structured fields; url: text-parse
+urlPrefix: https://html.spec.whatwg.org; spec: HTML
+    type: dfn
+        text: policy container; url: #policy-container
+        text: environment; url: #environment
+urlPrefix: https://infra.spec.whatwg.org; spec: INFRA
+    type: dfn
+        text: allowed; url: #allowed
+        text: blocked; url: #blocked
+        text: success; url: #success
+        text: failure; url: #failure
 </pre>
 <pre class="link-defaults">
-spec:html; type:dfn; for:/; text:policy container
+spec:fetch; type:dfn; for:/; text:request
 spec:fetch; type:method; text:fetch(input)
+spec:html; type:dfn; for:/; text:policy container
 spec:infra; type:dfn; for:/; text:list
 spec:infra; type:dfn; for:/; text:string
 spec:url; type:dfn; for:/; text:url
+spec:html; type:dfn; text:environment
 </pre>
 
 Introduction {#intro}
@@ -73,6 +84,7 @@ comprehensive.
   a Reporting API [[REPORTING]] [=endpoint=] specified in the `report-to` parameter (and defined
   through a separate [=Reporting-Endpoints=] header).
 </div>
+
 
 Threat Model {#threat-model}
 ------------
@@ -121,7 +133,7 @@ Overlap with Content Security Policy {#overlap-with-csp}
 ------------------------------------
 
 This proposal has a lot in common with Content Security Policy's approach to restrictions upon
-resource usage within a given context, [=Fetch directives=] in particular. Still, it seems
+resource usage within a given context, [=fetch directives=] in particular. Still, it seems
 reasonable to explore for a few reasons:
 
 1.  CSP's model is too granular: Developers who wish to mitigate the risk that data flows out of a
@@ -145,6 +157,7 @@ reasonable to explore for a few reasons:
     threat model. By creating a new policy with a narrow focus and explicit promise to developers,
     these discussions will have a defensible answer and a clear mandate to specification authors.
 
+
 Connection Allowlists {#allowlists}
 =====================
 
@@ -153,74 +166,365 @@ is allowed to connect. It is a [=struct=] with the following [=struct/items=]:
 
 *   <dfn for="Connection Allowlist">allowlist</dfn>, which is a [=list=] of [=URL patterns=]. It is
     an empty list unless otherwise specified.
-*   <dfn for="Connection Allowlist">report-to</dfn>, which is either `null` or a Reporting API
-    [=endpoint=]. It is `null` unless otherwise specified.
-*   <dfn for="Connection Allowlist">disposition</dfn>, which is either "`enforce`" or "`report`".
+*   <dfn for="Connection Allowlist">reporting endpoint</dfn>, which is either `null` or a Reporting
+    API [=endpoint=]. It is `null` unless otherwise specified.
+*   <dfn for="Connection Allowlist">disposition</dfn>, which is either
+    <dfn grammar for="Connection Allowlist/disposition">enforce</dfn> or
+    <dfn grammar for="Connection Allowlist/disposition">report</dfn>.
 
 
-The `Connection-Allowlist` Header {#header}
-=================================
+Connection Allowlist Headers {#headers}
+============================
 
 The <dfn http-header export>Connection-Allowlist</dfn> response [=header=] contains a list of
 serialized URL pattern strings that define the set of endpoints to which a context is allowed to
-connect.
+connect. This allowlist is enforced for a given context, blocking outgoing connections that don't
+match the asserted patterns. The <dfn http-header export>Connection-Allowlist-Report-Only</dfn>
+response [=header=] is a report-only variant, parsed in the same way, but only sending violation
+reports without blocking outgoing connections.
 
-It is a [=structured header=] whose value is a [=structured header/list=]. This list contains a
-single item whose value is an [=structured header/inner list=] of URL patterns serialized as
-[=structured header/strings=] or the [=structured header/token=]
-[=Connection-Allowlist/response-origin=]. The inner list may have a
-[=Connection-Allowlist/report-to=] [=structured header/parameter=] whose value is a
-[=structured header/token=] representing a Reporting API [=endpoint=].
+These Connection Allowlist headers are [=structured headers=] whose values are a
+[=structured header/list=] of [=structured header/inner lists=]. Servers may deliver a list with
+an arbitrary number of items, but only the first will be used. Any additional items in the list
+will be ignored.
+
+The [=structured header/inner list=] can contain either URL Patterns serialized as
+[=structured header/strings=], or the [=structured header/token=]
+<dfn grammar for="Connection-Allowlist">`response-origin`</dfn> which represents a pattern matching
+the [=/response=]'s [=response/URL=]'s [=url/origin=]. Unexpected values will be ignored.
+
+The [=structured header/inner list=] may have arbitrary [=structured header/parameters=]. The 
+<dfn grammar for="Connection-Allowlist">`report-to`</dfn> parameter's value will be parsed as a
+[=structured header/token=] representing a Reporting API [=endpoint=] [[!REPORTING]]. All other
+parameters will be ignored.
+
+Parsing {#parsing}
+-------
 
 <div algorithm>
-To <dfn abstract-op>parse a Connection Allowlist header</dfn> given a [=header=] (|header|),
-a [=URL=] (|response-url|), and a [=Connection Allowlist/disposition=] (|disposition|), execute
-the following steps:
+To <dfn abstract-op>parse a response's Connection Allowlists</dfn> given a [=/response=]
+(|response|):
 
-1.  Let |parsed| be the result of [$parsing structured fields$] with `input_string`
-    set to |header|'s [=header/value=], and `header_type` set to
-    "<a for="structured header">`list`</a>".
+1.  Let |allowlists| be an empty [=list=].
 
-2.  If |parsed| is `null`, or if |parsed|'s [=list/size=] is 0, return `null`.
+2.  Let |header| be the result of [=getting a structured field value=] named
+    [:Connection-Allowlist:] as a [=structured header/list=] from |response|'s
+    [=response/header list=].
 
-3.  If |parsed|[0] is not a [=list=], return `null`.
+3.  [$parse header|Parse a Connection Allowlist header$] given |header|, |response|'s
+    [=response/URL=], and <a grammar for="Connection Allowlist/disposition">enforce</a>. If the
+    result is not `null`, [=list/insert=] it into |allowlists|.
 
-4.  Let |allowlist| be a [=Connection Allowlist=] whose [=Connection Allowlist/disposition=] is
+4.  Let |header| be the result of [=getting a structured field value=] named
+    [:Connection-Allowlist-Report-Only:] as a [=structured header/list=] from |response|'s
+    [=response/header list=].
+
+5.  [$parse header|Parse a Connection Allowlist header$] given |header|, |response|'s
+    [=response/URL=], and <a grammar for="Connection Allowlist/disposition">report</a>. If the
+    result is not `null`, [=list/insert=] it into |allowlists|.
+
+6.  Return |allowlists|.
+
+</div>
+
+<div algorithm>
+To <dfn abstract-op local-lt="parse header">parse a Connection Allowlist header</dfn> given a
+[=structured header=] [=structured header/list=] (|list|), a [=/URL=] (|response-url|), and a
+[=Connection Allowlist/disposition=] (|disposition|):
+
+1.  If |list|'s [=list/size=] is 0, return `null`.
+
+2.  If |list|[0] is not an [=inner list=], return `null`.
+
+3.  Let |allowlist| be a [=Connection Allowlist=] whose [=Connection Allowlist/disposition=] is
     |disposition|.
 
-5.  [=list/iterate|For each=] |item| in |parsed|[0]:
+4.  [=list/iterate|For each=] |item| in |list|[0]:
 
-    1.  Let |pattern| be `null`.
+    1.  Let |serialized pattern| be `null`.
 
     2.  If |item| is the [=structured header/token=] <a grammar>`response-origin`</a>:
 
-        1.  Set |pattern| to the [=ASCII serialization of an origin|ASCII serialization=] of
-            |response-url|'s [=url/origin=].
+        1.  Set |serialized pattern| to the [=ASCII serialization of an origin|ASCII serialization=]
+            of |response-url|'s [=url/origin=].
 
-    3.  If |item| is a [=string=], set |pattern| to |item|.
+    3.  If |item| is a [=string=], set |serialized pattern| to |item|.
 
-    4.  If |pattern| is `null`, [=continue=].
+    4.  If |serialized pattern| is `null`, [=continue=].
 
-        Note: We're skipping over any invalid input here. We could plausibly be more draconian in
-        our parsing, but that likely limits our future flexibility.
-
-    5.  [=URL pattern/Create=] a URL pattern given |item| as the input, `null` as the base URL, and
-        an empty dictionary as the options, and |append| it to |allowlist|'s
-        [=Connection Allowlist/allowlist=].
+    5.  Let |URL pattern| be the result of executing [=build a URL pattern from an HTTP structured
+        field value=] given |serialized pattern| with `null` as the base URL.
 
         If this step throws an error, [=continue=].
 
-6.  [=list/iterate|For each=] |key| → |value| in |parsed|[0]'s [=structured header|parameters=]:
+    6.  [=list/Append=] |URL pattern| to |allowlist|'s [=Connection Allowlist/allowlist=].
 
-    1.  If |key| is <a grammar>report-to`</a> and |value| is a [=structured header/token=],
-        set |allowlist|'s [=Connection Allowlist/report-to=] to |value|.
+5.  [=list/iterate|For each=] |key| → |value| in |list|[0]'s [=structured header|parameters=]:
 
-        Note: Again, we'll simply ignore any invalid input to leave room for the future.
-         
-7.  Return |allowlist|.
+    1.  If |key| is <a grammar for="Connection-Allowlist">`report-to`</a> and |value| is a
+        [=structured header/token=], set |allowlist|'s [=Connection Allowlist/reporting endpoint=]
+        to |value|.
+
+6.  Return |allowlist|.
+
+
+Note: We're skipping over any invalid input in the parsing algorithm. We could plausibly be more
+draconian in our parsing, but that would likely limit our future flexibility.
+</div>
+
+
+Matching {#matching}
+--------
+
+Depending on the type of connection being established, we may have a [=request=] to work with, we
+may only have a [=URL=], or we may have even less. <a attr-value for="link/rel">`dns-prefetch`</a>,
+for example, can only match against a host. The algorithms below spell out how connection allowlist
+checks work in these scenarios:
+
+<div algorithm>
+To <dfn abstract-op local-lt="matches">match a URL to a Connection Allowlist</dfn> given a [=/URL=]
+(|url|) and a [=connection allowlist=] (|connection allowlist|), execute the following steps,
+which return [=success=] or [=failure=].
+
+1.  [=list/iterate|For each=] |pattern| in |connection allowlist|'s
+    [=Connection Allowlist/allowlist=]:
+
+    1.  If [=URL pattern/match|URL pattern matching=] given |pattern| and |url| does not return
+        `null`, return [=success=].
+
+2.  Return [=failure=].
+
+</div>
+
+<div algorithm>
+To <dfn abstract-op local-lt="match host">match a host to a Connection Allowlist</dfn> given a
+[=/host=] (|host|) and a [=connection allowlist=] (|connection allowlist|), execute the following
+steps, which return [=success=] or [=failure=].
+
+1.  [=list/iterate|For each=] |pattern| in |connection allowlist|'s
+    [=Connection Allowlist/allowlist=]:
+
+    1.  Let |input| be a new {{URLPatternInit}} dictionary whose {{URLPatternInit/hostname}} is
+        set to |pattern|'s <a spec=URLPATTERN for="URL pattern">hostname component</a>.
+
+    2.  Let |host-only pattern| be the result of [=URL pattern/create|creating a URL pattern=] given
+        |input|, `null` as the base URL, and an empty [=map=] as the options.
+
+    3.  Let |synthetic url| be the result of [=URL parser|parsing=] the concatenation of
+        "https://" and |host| as a URL.
+
+    4.  If [=URL pattern/match|URL pattern matching=] given |host-only pattern| and |synthetic url| does not
+        return `null`, return [=success=].
+
+2.  Return [=failure=].
+
+Note: By creating a new pattern with only the hostname component and synthesizing a URL for |host|,
+we're able to return a match if _any_ pattern in the allowlist could allow a request to that host
+using any protocol, on any port, with any path, and so on.
+</div>
+
+<div algorithm>
+The <dfn abstract-op export>should |url| be blocked by Connection Allowlist</dfn> algorithm takes a
+[=/URL=] (|url|), an [=environment=] (|environment|), and a [=list=] of [=connection allowlists=]
+(|connection allowlists|). It returns either [=allowed=] or [=blocked=]:
+
+1.  [=list/iterate|For each=] |connection allowlist| in |connection allowlists|:
+    
+    1.  If |url| [$matches$] |connection allowlist|'s [=Connection Allowlist/allowlist=],
+        [=continue=].
+
+    2.  [$report|Report a violation$] given |url|, |environment|, and
+        |connection allowlist|.
+
+    3.  If |connection allowlist|'s [=Connection Allowlist/disposition=] is
+        <a grammar for="Connection Allowlist/disposition">enforce</a>, return [=blocked=].
+
+3.  Return [=allowed=].
+
+</div>
+
+<div algorithm>
+The <dfn abstract-op export>should |request| be blocked by Connection Allowlists</dfn> algorithm
+takes a [=/request=] (|request|), and returns either [=allowed=] or [=blocked=]:
+
+1.  If [=/request=]'s [=request/URL list=]'s [=list/size=] is greater than 1, return [=blocked=].
+
+    ISSUE: See the open question below in [[#redirects]].
+
+2.  Return the result of executing [$should url be blocked by Connection Allowlist$] given
+    |request|'s [=request/url=], |request|'s [=request/client=], and |request|'s
+    [=request/policy container=]'s [=policy container/connection allowlists=].
+
+</div>
+
+<div algorithm>
+The <dfn abstract-op export>should |host| be blocked by Connection Allowlists</dfn> algorithm takes
+a [=/host=] (|host|), an [=environment=] (|environment|), and a [=list=] of
+[=connection allowlists=] (|connection allowlists|). It returns either [=allowed=] or [=blocked=]:
+
+1.  [=list/iterate|For each=] |connection allowlist| in |connection allowlists|:
+ 
+    1.  If |host| [$match host|host-matches$] |connection allowlist|, [=continue=].
+
+    2.  [$report|Report a violation$] given |host|, |environment|, and
+        |connection allowlist|.
+
+    3.  If |connection allowlist|'s [=Connection Allowlist/disposition=] is
+        <a grammar for="Connection Allowlist/disposition">enforce</a>, return [=blocked=].
+
+2.  Return [=allowed=].
 
 </div>
 
 
-<dfn grammar>response-origin</dfn>
-<dfn grammar>report-to</dfn>
+Reporting {#reporting}
+---------
+
+Like other policy mechanisms, Connection Allowlists will report each violation to a Reporting API
+endpoint specified in the allowlist headers. Violations are represented by the following dictionary
+type:
+
+<xmp class="idl">
+enum ConnectionAllowlistDisposition { "enforce", "report" };
+
+dictionary ConnectionAllowlistViolationReport : ReportBody {
+  USVString url;
+  USVString connection;
+  sequence<DOMString> allowlist;
+  ConnectionAllowlistDisposition disposition;
+};
+</xmp>
+
+{{ConnectionAllowlistViolationReport}}'s {{ConnectionAllowlistViolationReport/connection}} is the
+serialized [=/URL=] of the connection which violated the allowlist.
+
+{{ConnectionAllowlistViolationReport}}'s {{ConnectionAllowlistViolationReport/allowlist}} is the
+[=Connection Allowlist/allowlist=] which was violated.
+
+{{ConnectionAllowlistViolationReport}}'s {{ConnectionAllowlistViolationReport/disposition}}
+is the {{ConnectionAllowlistViolationReport/allowlist}}'s [=Connection Allowlist/disposition=].
+
+<div algorithm>
+To <dfn abstract-op local-lt="report">report a violation</dfn> given a [=URL=] (|resource URL|),
+an [=environment=] (|environment|), and a [=connection allowlist=] (|allowlist|):
+
+1. If |allowlist|'s [=Connection Allowlist/reporting endpoint=] is `null`, return.
+
+2. Let |violation| be a new {{ConnectionAllowlistViolationReport}}, initialized as follows:
+
+   : {{ConnectionAllowlistViolationReport/connection}}
+   :: |resource URL|, [=strip URL for use in reports|stripped for use in reports=].
+
+      Note: Because we block redirects, we don't need to worry about [=request/url=] vs
+      [=request/current url=]. When we go back on that decision (see [[#redirects]]), we'll want
+      to ensure we use [=request/url=] to avoid leaking more information than necessary about
+      redirect targets.
+
+   : {{ConnectionAllowlistViolationReport/allowlist}}
+   :: |allowlist|'s [=Connection Allowlist/allowlist=]
+
+   : {{ConnectionAllowlistViolationReport/disposition}}
+   :: |allowlist|'s [=Connection Allowlist/disposition=].
+
+3.  [=Generate and queue a report=] given |environment| as the context, "`connection-allowlist`" as
+    the type, |allowlist|'s [=Connection Allowlist/reporting endpoint=] as the destination, and
+    |violation| as the data.
+
+</div>
+
+Monkey-Patches {#monkey-patching}
+==============
+
+Integration with Fetch {#fetch}
+----------------------
+
+We'll handle [=requests=] by adding a blocking check in [[FETCH#main-fetch]] alongside other checks
+that serve the same purpose:
+
+<div algorithm="monkey patching main fetch">
+  In Main Fetch, we'll adjust step 7 as follows:
+
+  <ol start="7">
+    7.  If should request be blocked due to a bad port, should fetching request be blocked as mixed
+        content, should request be blocked by Content Security Policy, <ins>[$should request be 
+        blocked by Connection Allowlists$], </ins>or should request be blocked by Integrity Policy
+        Policy returns blocked, then set response to a network error.
+  </ol>
+</div>
+
+Fetch also defines algorithms at a lower level which are used to establish connections for APIs
+which aren't based on [=requests=]. We'll hook into [=resolve an origin=] and [=obtain a
+connection=] to handle things like DNS prefetch, Web Transport, etc:
+
+<div algorithm="monkey patching resolve an origin">
+  In [=resolve an origin=], we'll call out to the host-only matching algorithm above to determine
+  whether any pattern could potentially allow a connection to a given host. If not, we'll fail
+  resolution.
+
+  1. <ins>If [$should host be blocked by Connection Allowlists$] returns [=blocked=] when executed
+     upon <var ignore>origin</var>'s [=origin/host=], |allowlist|, and |environment|, return
+     [=failure=].</ins>
+
+  Issue: This will require us to pass additional information into this algorithm's callsites
+  to identify the allowlist which ought to be used (|allowlist|, |environment|).
+</div>
+
+<div algorithm="monkey patching obtain a connection">
+  In [=obtain a connection=], we'll add a check before the current step 2:
+
+  <ol start=2>
+    2.  <ins>If <var ignore>url</var></ins> |allowlist| |environment|
+  </ol>
+
+  Issue: This will require us to pass additional information into this algorithm's callsites
+  to identify the allowlist which ought to be used (|allowlist|, |environment|).
+</div>
+
+
+Integration with HTML {#html}
+---------------------
+
+To integrate the above into HTML, we'll add a new
+<dfn for="policy container">connection allowlists</dfn> item to the [=/policy container=]
+[=struct=], containing a [=list=] of [=connection allowlists=]. This will be populated by adding a
+step to the [=create a policy container from a fetch response=] algorithm:
+
+<div algorithm="monkey patching policy container creation">
+  <ol start="6">
+    6.  Parse Integrity-Policy headers with |response| and |result|.
+    7.  <ins>Set |result|'s [=policy container/connection allowlists=] to the result of
+        [$parse a response's Connection Allowlists|parsing a response's Connection Allowlists$] given
+        |response|.</ins>
+    8.  Return |result|.
+  </ol>
+</div>
+
+
+Open Questions {#questions}
+==============
+
+Redirects {#redirects}
+---------
+
+Currently, we specify that any redirected URL fails. This simplifies the initial proposal for
+discussion, but seems unlikely to satisfy developers with real-world deployment needs. I think we
+have a few realistic options:
+
+1.  Apply the allowlist to every hop of a redirect chain. This has the advantage of matching CSP's
+    behavior that developers are already familiar with. It _is_ a cross-origin data leak insofar as it
+    provides insight about another origin's decisions, which is unfortunate but perhaps unavoidable.
+
+2.  Allow _a specific rule_'s redirect chain to arbitrarily redirect. This narrows the concerns
+    above by forcing developers to annotate the allowlist with their expectations. It might be perfectly
+    acceptable for `https://trusted.example/` to redirect users to arbitrary locations, while other
+    endpoints are expected to remain put. Annotating list items should make this kind of distinction
+    possible if necessary (e.g. `("https://trusted.example/";redirection-allowed "https://less-so.example/")`).
+
+3.  Narrow the above by allowing _a specific rule_ to redirect so long as the targets match the allowlist.
+    This creates less opportunity for unexpected connection than 1 or 2 by requiring developers to annotate
+    the specific rules which can redirect, but would do so in a way that's less broad (e.g.
+    `("https://semi-trusted.example/";redirection-allowed=within-allowlist ...)`).
+
+We could add more options as well. CSP's earlier `navigate-to` proposal distinguished between intermediate
+redirects and the final, non-redirect response. You could imagine adding those kinds of options either to
+the entire allowlist or individual rules. Feedback here as well would be much appreciated.
