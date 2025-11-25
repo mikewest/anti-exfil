@@ -6,7 +6,7 @@
   <link href="https://www.w3.org/StyleSheets/TR/2021/W3C-UD" rel="stylesheet">
   <meta content="Bikeshed version 86e3be07a, updated Tue Nov 18 16:58:08 2025 +0000" name="generator">
   <link href="https://wicg.github.io/connection-allowlists/" rel="canonical">
-  <meta content="296883734e4d8b9534528261348e03b618a1fcd9" name="revision">
+  <meta content="8c0ffbc571656b699889f22f17325caf4f2ec55d" name="revision">
   <meta content="dark light" name="color-scheme">
   <link href="https://www.w3.org/StyleSheets/TR/2021/dark.css" media="(prefers-color-scheme: dark)" rel="stylesheet" type="text/css">
 <style>/* Boilerplate: style-autolinks */
@@ -801,6 +801,7 @@ in a way that’s narrowly tailored to suit the problem.</p>
      <ol class="toc">
       <li><a href="#fetch"><span class="secno">4.1</span> <span class="content">Integration with Fetch</span></a>
       <li><a href="#html"><span class="secno">4.2</span> <span class="content">Integration with HTML</span></a>
+      <li><a href="#rtc"><span class="secno">4.3</span> <span class="content">Integration with WebRTC</span></a>
      </ol>
     <li>
      <a href="#security"><span class="secno">5</span> <span class="content">Security Considerations</span></a>
@@ -1250,11 +1251,9 @@ which aren’t based on <a data-link-type="dfn" href="https://fetch.spec.whatwg.
     <ol>
      <li data-md>
       <ins>If <a data-link-type="abstract-op" href="#abstract-opdef-should-host-be-blocked-by-connection-allowlists" id="ref-for-abstract-opdef-should-host-be-blocked-by-connection-allowlists">should host be blocked by Connection Allowlists</a> returns <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#blocked" id="ref-for-blocked⑥">blocked</a> when executed
- upon <var>origin</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host" id="ref-for-concept-origin-host">host</a>, <var>allowlist</var>, and <var>environment</var>, return
- <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#failure" id="ref-for-failure④">failure</a>.</ins>
+ upon <var>origin</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host" id="ref-for-concept-origin-host">host</a>, <var>environment</var>, and
+ <var>allowlists</var>, then return <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#failure" id="ref-for-failure④">failure</a>.</ins>
     </ol>
-    <p class="issue" id="issue-f6aa86e5"><a class="self-link" href="#issue-f6aa86e5"></a> This will require us to pass additional information into this algorithm’s callsites
-  to identify the allowlist which ought to be used (<var>allowlist</var>, <var>environment</var>).</p>
    </div>
    <div class="algorithm" data-algorithm="monkey patching obtain a connection">
     
@@ -1263,13 +1262,16 @@ which aren’t based on <a data-link-type="dfn" href="https://fetch.spec.whatwg.
   
     <ol start="2">
      <li data-md>
-      <ins>If <var>url</var></ins>
-       <var>allowlist</var> <var>environment</var>
-
+      <ins>If <a data-link-type="abstract-op" href="#abstract-opdef-should-url-be-blocked-by-connection-allowlist" id="ref-for-abstract-opdef-should-url-be-blocked-by-connection-allowlist①">should url be blocked by Connection Allowlist</a> returns <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#blocked" id="ref-for-blocked⑦">blocked</a> when executed
+upon <var>url</var>, <var>environment</var>, and <var>allowlists</var>,
+then return <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#failure" id="ref-for-failure⑤">failure</a>.</ins>
     </ol>
-    <p class="issue" id="issue-f6aa86e5①"><a class="self-link" href="#issue-f6aa86e5①"></a> This will require us to pass additional information into this algorithm’s callsites
-  to identify the allowlist which ought to be used (<var>allowlist</var>, <var>environment</var>).</p>
    </div>
+   <p class="issue" id="issue-dcabf3fa"><a class="self-link" href="#issue-dcabf3fa"></a> The changes to Fetch will require us to pass additional information into low-level
+algorithms' callsites to identify the allowlist which ought to be used and the context to be used
+for reporting. It might be better to instead ask those callsites to perform the checks themselves.
+My feeling is that we’ll be more successful by centralizing the logic, but it might be simpler to
+take a piecemeal approach.</p>
    <h3 class="heading settled" data-level="4.2" id="html"><span class="secno">4.2. </span><span class="content">Integration with HTML</span><a class="self-link" href="#html"></a></h3>
    <p>To integrate the above into HTML, we’ll add a new
 <dfn class="dfn-paneled" data-dfn-for="policy container" data-dfn-type="dfn" data-noexport id="policy-container-connection-allowlists">connection allowlists</dfn> item to the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#policy-container" id="ref-for-policy-container①">policy container</a>
@@ -1287,6 +1289,8 @@ given <var>response</var>.</ins>
       <p>Return <var>result</var>.</p>
     </ol>
    </div>
+   <h3 class="heading settled" data-level="4.3" id="rtc"><span class="secno">4.3. </span><span class="content">Integration with WebRTC</span><a class="self-link" href="#rtc"></a></h3>
+   <p class="issue" id="issue-098c64d7"><a class="self-link" href="#issue-098c64d7"></a> I need to read more, as I have no idea how any of this works from a spec perspective. :)</p>
    <h2 class="heading settled" data-level="5" id="security"><span class="secno">5. </span><span class="content">Security Considerations</span><a class="self-link" href="#security"></a></h2>
    <h3 class="heading settled" data-level="5.1" id="security-same-origin"><span class="secno">5.1. </span><span class="content">Same-Origin Contexts</span><a class="self-link" href="#security-same-origin"></a></h3>
    <p>The threat model described in <a href="#threat-model">§ 1.1 Threat Model</a> is intentionally narrow, and developers will need
@@ -1584,10 +1588,12 @@ the entire allowlist or individual rules. Feedback here as well would be much ap
   <h2 class="heading no-num no-ref settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
   <div style="counter-reset:issue">
    <div class="issue"> See the open question below in <a href="#redirects">§ 5.3 Redirects</a>. <a class="issue-return" href="#issue-10cd8a62" title="Jump to section">↵</a></div>
-   <div class="issue"> This will require us to pass additional information into this algorithm’s callsites
-  to identify the allowlist which ought to be used (<var>allowlist</var>, <var>environment</var>). <a class="issue-return" href="#issue-f6aa86e5" title="Jump to section">↵</a></div>
-   <div class="issue"> This will require us to pass additional information into this algorithm’s callsites
-  to identify the allowlist which ought to be used (<var>allowlist</var>, <var>environment</var>). <a class="issue-return" href="#issue-f6aa86e5①" title="Jump to section">↵</a></div>
+   <div class="issue"> The changes to Fetch will require us to pass additional information into low-level
+algorithms' callsites to identify the allowlist which ought to be used and the context to be used
+for reporting. It might be better to instead ask those callsites to perform the checks themselves.
+My feeling is that we’ll be more successful by centralizing the logic, but it might be simpler to
+take a piecemeal approach. <a class="issue-return" href="#issue-dcabf3fa" title="Jump to section">↵</a></div>
+   <div class="issue"> I need to read more, as I have no idea how any of this works from a spec perspective. :) <a class="issue-return" href="#issue-098c64d7" title="Jump to section">↵</a></div>
    <div class="issue"> It would also be ideal to give developers control over
 their dependencies' allowlists to some extent. An opt-in mechanism rooted in something like
 <a data-link-type="dfn" href="https://wicg.github.io/document-policy/#required-document-policy">required document policy</a> or <a data-link-type="biblio" href="#biblio-csp-embedded-enforcement" title="Content Security Policy: Embedded Enforcement">[csp-embedded-enforcement]</a>] might
@@ -1821,7 +1827,7 @@ let dfnPanelData = {
 "7660bec4": {"dfnID":"7660bec4","dfnText":"parameters","external":true,"refSections":[{"refs":[{"id":"ref-for-name-parameters"}],"title":"3. Connection Allowlist Headers"}],"url":"https://www.rfc-editor.org/rfc/rfc9651#name-parameters"},
 "77a2ee6e": {"dfnID":"77a2ee6e","dfnText":"host","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-origin-host"}],"title":"4.1. Integration with Fetch"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host"},
 "7ed9d314": {"dfnID":"7ed9d314","dfnText":"generate and queue a report","external":true,"refSections":[{"refs":[{"id":"ref-for-generate-and-queue-a-report"}],"title":"3.3. Reporting"}],"url":"https://w3c.github.io/reporting/#generate-and-queue-a-report"},
-"83af367f": {"dfnID":"83af367f","dfnText":"blocked","external":true,"refSections":[{"refs":[{"id":"ref-for-blocked"},{"id":"ref-for-blocked\u2460"},{"id":"ref-for-blocked\u2461"},{"id":"ref-for-blocked\u2462"},{"id":"ref-for-blocked\u2463"},{"id":"ref-for-blocked\u2464"}],"title":"3.2. Matching"},{"refs":[{"id":"ref-for-blocked\u2465"}],"title":"4.1. Integration with Fetch"}],"url":"https://infra.spec.whatwg.org/#blocked"},
+"83af367f": {"dfnID":"83af367f","dfnText":"blocked","external":true,"refSections":[{"refs":[{"id":"ref-for-blocked"},{"id":"ref-for-blocked\u2460"},{"id":"ref-for-blocked\u2461"},{"id":"ref-for-blocked\u2462"},{"id":"ref-for-blocked\u2463"},{"id":"ref-for-blocked\u2464"}],"title":"3.2. Matching"},{"refs":[{"id":"ref-for-blocked\u2465"},{"id":"ref-for-blocked\u2466"}],"title":"4.1. Integration with Fetch"}],"url":"https://infra.spec.whatwg.org/#blocked"},
 "857d5516": {"dfnID":"857d5516","dfnText":"client","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-client"}],"title":"3.2. Matching"}],"url":"https://fetch.spec.whatwg.org/#concept-request-client"},
 "86efadaf": {"dfnID":"86efadaf","dfnText":"policy container","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-policy-container"}],"title":"3.2. Matching"}],"url":"https://fetch.spec.whatwg.org/#concept-request-policy-container"},
 "8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"3.3. Reporting"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
@@ -1845,12 +1851,12 @@ let dfnPanelData = {
 "abstract-opdef-report-a-violation": {"dfnID":"abstract-opdef-report-a-violation","dfnText":"report a violation","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-report-a-violation"},{"id":"ref-for-abstract-opdef-report-a-violation\u2460"}],"title":"3.2. Matching"}],"url":"#abstract-opdef-report-a-violation"},
 "abstract-opdef-should-host-be-blocked-by-connection-allowlists": {"dfnID":"abstract-opdef-should-host-be-blocked-by-connection-allowlists","dfnText":"should host be blocked by Connection Allowlists","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-should-host-be-blocked-by-connection-allowlists"}],"title":"4.1. Integration with Fetch"}],"url":"#abstract-opdef-should-host-be-blocked-by-connection-allowlists"},
 "abstract-opdef-should-request-be-blocked-by-connection-allowlists": {"dfnID":"abstract-opdef-should-request-be-blocked-by-connection-allowlists","dfnText":"should request be blocked by Connection Allowlists","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-should-request-be-blocked-by-connection-allowlists"}],"title":"4.1. Integration with Fetch"}],"url":"#abstract-opdef-should-request-be-blocked-by-connection-allowlists"},
-"abstract-opdef-should-url-be-blocked-by-connection-allowlist": {"dfnID":"abstract-opdef-should-url-be-blocked-by-connection-allowlist","dfnText":"should url be blocked by Connection Allowlist","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-should-url-be-blocked-by-connection-allowlist"}],"title":"3.2. Matching"}],"url":"#abstract-opdef-should-url-be-blocked-by-connection-allowlist"},
+"abstract-opdef-should-url-be-blocked-by-connection-allowlist": {"dfnID":"abstract-opdef-should-url-be-blocked-by-connection-allowlist","dfnText":"should url be blocked by Connection Allowlist","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-should-url-be-blocked-by-connection-allowlist"}],"title":"3.2. Matching"},{"refs":[{"id":"ref-for-abstract-opdef-should-url-be-blocked-by-connection-allowlist\u2460"}],"title":"4.1. Integration with Fetch"}],"url":"#abstract-opdef-should-url-be-blocked-by-connection-allowlist"},
 "ae56d57e": {"dfnID":"ae56d57e","dfnText":"URL list","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-url-list"}],"title":"3.2. Matching"}],"url":"https://fetch.spec.whatwg.org/#concept-request-url-list"},
 "b0d7f3c3": {"dfnID":"b0d7f3c3","dfnText":"USVString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-USVString"},{"id":"ref-for-idl-USVString\u2460"}],"title":"3.3. Reporting"}],"url":"https://webidl.spec.whatwg.org/#idl-USVString"},
 "b33787b2": {"dfnID":"b33787b2","dfnText":"policy container","external":true,"refSections":[{"refs":[{"id":"ref-for-policy-container"}],"title":"1.1. Threat Model"},{"refs":[{"id":"ref-for-policy-container\u2460"}],"title":"4.2. Integration with HTML"},{"refs":[{"id":"ref-for-policy-container\u2461"}],"title":"5.1. Same-Origin Contexts"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#policy-container"},
 "b410a6ef": {"dfnID":"b410a6ef","dfnText":"ASCII serialization of an origin","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-serialisation-of-an-origin"}],"title":"3.1. Parsing"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin"},
-"bf8d9616": {"dfnID":"bf8d9616","dfnText":"failure","external":true,"refSections":[{"refs":[{"id":"ref-for-failure"},{"id":"ref-for-failure\u2460"},{"id":"ref-for-failure\u2461"},{"id":"ref-for-failure\u2462"}],"title":"3.2. Matching"},{"refs":[{"id":"ref-for-failure\u2463"}],"title":"4.1. Integration with Fetch"}],"url":"https://infra.spec.whatwg.org/#failure"},
+"bf8d9616": {"dfnID":"bf8d9616","dfnText":"failure","external":true,"refSections":[{"refs":[{"id":"ref-for-failure"},{"id":"ref-for-failure\u2460"},{"id":"ref-for-failure\u2461"},{"id":"ref-for-failure\u2462"}],"title":"3.2. Matching"},{"refs":[{"id":"ref-for-failure\u2463"},{"id":"ref-for-failure\u2464"}],"title":"4.1. Integration with Fetch"}],"url":"https://infra.spec.whatwg.org/#failure"},
 "bf9f0d4e": {"dfnID":"bf9f0d4e","dfnText":"create","external":true,"refSections":[{"refs":[{"id":"ref-for-url-pattern-create"}],"title":"3.2. Matching"}],"url":"https://urlpattern.spec.whatwg.org/#url-pattern-create"},
 "c88f3887": {"dfnID":"c88f3887","dfnText":"item","external":true,"refSections":[{"refs":[{"id":"ref-for-struct-item"}],"title":"2. Connection Allowlists"}],"url":"https://infra.spec.whatwg.org/#struct-item"},
 "c9aec5e7": {"dfnID":"c9aec5e7","dfnText":"string","external":true,"refSections":[{"refs":[{"id":"ref-for-name-string"}],"title":"3. Connection Allowlist Headers"}],"url":"https://www.rfc-editor.org/rfc/rfc9651#name-string"},
