@@ -3,9 +3,9 @@ Connection Allowlists
 
 Developers wish to have control over the resources loaded into their pages'
 contexts and the endpoints to which their pages can make requests. This control
-is necessary for several purposes, including limiting the ways in which users'
-data can flow through the user agent (mitigating exfiltration attacks) and
-ensuring control over a site's architecture and depedencies.
+is necessary for several purposes, ranging from architectural insight into and
+constraints upon a site's dependencies to the mitigation of exfiltration attacks
+which might otherwise put users' data at risk.
 
 Content Security Policy addresses some of this need, but does so in a way that
 is more granular than is necessary for the most critical use cases, and with a
