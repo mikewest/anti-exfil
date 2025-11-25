@@ -427,6 +427,7 @@ an [=environment=] (|environment|), and a [=connection allowlist=] (|allowlist|)
 Monkey-Patches {#monkey-patching}
 ==============
 
+
 Integration with Fetch {#fetch}
 ----------------------
 
@@ -454,23 +455,26 @@ connection=] to handle things like DNS prefetch, Web Transport, etc:
   resolution.
 
   1. <ins>If [$should host be blocked by Connection Allowlists$] returns [=blocked=] when executed
-     upon <var ignore>origin</var>'s [=origin/host=], |allowlist|, and |environment|, return
-     [=failure=].</ins>
+     upon <var ignore>origin</var>'s [=origin/host=], <var ignore>environment</var>, and
+     <var ignore>allowlists</var>, then return [=failure=].</ins>
 
-  Issue: This will require us to pass additional information into this algorithm's callsites
-  to identify the allowlist which ought to be used (|allowlist|, |environment|).
 </div>
 
 <div algorithm="monkey patching obtain a connection">
   In [=obtain a connection=], we'll add a check before the current step 2:
 
   <ol start=2>
-    2.  <ins>If <var ignore>url</var></ins> |allowlist| |environment|
+    2.  <ins>If [$should url be blocked by Connection Allowlist$] returns [=blocked=] when executed
+        upon <var ignore>url</var>, <var ignore>environment</var>, and <var ignore>allowlists</var>,
+        then return [=failure=].</ins>
   </ol>
-
-  Issue: This will require us to pass additional information into this algorithm's callsites
-  to identify the allowlist which ought to be used (|allowlist|, |environment|).
 </div>
+
+Issue: The changes to Fetch will require us to pass additional information into low-level
+algorithms' callsites to identify the allowlist which ought to be used and the context to be used
+for reporting. It might be better to instead ask those callsites to perform the checks themselves.
+My feeling is that we'll be more successful by centralizing the logic, but it might be simpler to
+take a piecemeal approach.
 
 
 Integration with HTML {#html}
@@ -490,6 +494,12 @@ step to the [=create a policy container from a fetch response=] algorithm:
     8.  Return |result|.
   </ol>
 </div>
+
+
+Integration with WebRTC {#rtc}
+-----------------------
+
+ISSUE: I need to read more, as I have no idea how any of this works from a spec perspective. :)
 
 
 Security Considerations {#security}
