@@ -34,6 +34,7 @@ spec:fetch; type:dfn; for:/; text:request
 spec:fetch; type:method; text:fetch(input)
 spec:html; type:dfn; for:/; text:environment
 spec:html; type:dfn; for:/; text:policy container
+spec:html; type:interface; text:BroadcastChannel
 spec:infra; type:dfn; for:/; text:list
 spec:infra; type:dfn; for:/; text:string
 spec:infra; type:dfn; text:success
@@ -484,26 +485,60 @@ step to the [=create a policy container from a fetch response=] algorithm:
   <ol start="6">
     6.  Parse Integrity-Policy headers with |response| and |result|.
     7.  <ins>Set |result|'s [=policy container/connection allowlists=] to the result of
-        [$parse a response's Connection Allowlists|parsing a response's Connection Allowlists$] given
-        |response|.</ins>
+        [$parse a response's Connection Allowlists|parsing a response's Connection Allowlists$]
+        given |response|.</ins>
     8.  Return |result|.
   </ol>
 </div>
 
 
-Open Questions {#questions}
-==============
+Security Considerations {#security}
+=======================
+
+Same-Origin Contexts {#security-same-origin}
+--------------------
+
+The threat model described in [[#threat-model]] is intentionally narrow, and developers will need
+to carefully consider how to layer the allowlisting mechanism described here into their defenses.
+Most saliently, the mechanism is context-specific, not origin-wide. This leaves broad opportunity
+for an attacker with scripting access to bypass a context's allowlist by finding a same-origin
+context with lower restrictions. Integration with HTML's [=policy container=] addresses some of
+those possibilities, but it's likely that others will exist. Allowlisting the document's origin
+(via <a grammar for="Connection-Allowlist">`response-origin`</a> or explicitly), reaching up
+through the frame tree, etc.
+
+There are scenarios in which developers can avoid this risk by sandboxing the allowlisted context
+away from its normal origin via <{iframe/sandbox}> attributes or Content Security Policy's
+<a spec=CSP>sandbox</a> directive. In those cases, no document will be same-origin, and the
+boundaries will be easier to hold.
+
+ISSUE(WICG/connection-allowlists#1): It would also be ideal to give developers control over
+their dependencies' allowlists to some extent. An opt-in mechanism rooted in something like
+<a spec="document-policy">required document policy</a> or [[csp-embedded-enforcement]]] might
+be helpful to explore.
+
+
+`postMessage(...)` {#security-postmessage}
+------------------
+
+This proposal concerns itself entirely with network connections, which may surprise developers
+who would expect communication via explicit communication channels like
+{{Window/postMessage(message, options)}}, {{MessageChannel}}, {{BroadcastChannel}}, and so on to
+be covered. It could make sense to extend the model to include those as well, as they all fit
+into an origin-based model which could be meaningfully compared against the allowlist.
+
 
 Redirects {#redirects}
 ---------
 
 Currently, we specify that any redirected URL fails. This simplifies the initial proposal for
-discussion, but seems unlikely to satisfy developers with real-world deployment needs. I think we
-have a few realistic options:
+discussion and ensures we don't leak data, but seems unlikely to satisfy developers with real-world
+deployment needs. I think we have a few realistic options:
 
 1.  Apply the allowlist to every hop of a redirect chain. This has the advantage of matching CSP's
-    behavior that developers are already familiar with. It _is_ a cross-origin data leak insofar as it
-    provides insight about another origin's decisions, which is unfortunate but perhaps unavoidable.
+    behavior that developers are already familiar with. It _is_ a cross-origin data leak insofar as
+    it provides insight about another origin's decisions, which is unfortunate but perhaps
+    unavoidable (and non-unique).
 
 2.  Allow _a specific rule_'s redirect chain to arbitrarily redirect. This narrows the concerns
     above by forcing developers to annotate the allowlist with their expectations. It might be perfectly
