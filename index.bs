@@ -28,25 +28,16 @@ urlPrefix: https://www.rfc-editor.org/rfc/rfc9651; spec: RFC9651
             text: parameters; url: #name-parameters
     type: abstract-op
         text: parsing structured fields; url: text-parse
-urlPrefix: https://html.spec.whatwg.org; spec: HTML
-    type: dfn
-        text: policy container; url: #policy-container
-        text: environment; url: #environment
-urlPrefix: https://infra.spec.whatwg.org; spec: INFRA
-    type: dfn
-        text: allowed; url: #allowed
-        text: blocked; url: #blocked
-        text: success; url: #success
-        text: failure; url: #failure
 </pre>
 <pre class="link-defaults">
 spec:fetch; type:dfn; for:/; text:request
 spec:fetch; type:method; text:fetch(input)
+spec:html; type:dfn; for:/; text:environment
 spec:html; type:dfn; for:/; text:policy container
 spec:infra; type:dfn; for:/; text:list
 spec:infra; type:dfn; for:/; text:string
+spec:infra; type:dfn; text:success
 spec:url; type:dfn; for:/; text:url
-spec:html; type:dfn; text:environment
 </pre>
 
 Introduction {#intro}
