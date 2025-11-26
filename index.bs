@@ -322,7 +322,7 @@ The <dfn abstract-op export>should |url| be blocked by Connection Allowlist</dfn
 
 1.  [=list/iterate|For each=] |connection allowlist| in |connection allowlists|:
     
-    1.  If |url| [$matches$] |connection allowlist|'s [=Connection Allowlist/allowlist=],
+    1.  If [=match a URL to a Connection Allowlist=] given |url| and |connection allowlist| returns [=success=],
         [=continue=].
 
     2.  [$report|Report a violation$] given |url|, |environment|, and
@@ -413,7 +413,7 @@ an [=environment=] (|environment|), and a [=connection allowlist=] (|allowlist|)
       redirect targets.
 
    : {{ConnectionAllowlistViolationReport/allowlist}}
-   :: |allowlist|'s [=Connection Allowlist/allowlist=]
+   :: A new list containing the result of serializing each pattern in |allowlist|'s [=Connection Allowlist/allowlist=]
 
    : {{ConnectionAllowlistViolationReport/disposition}}
    :: |allowlist|'s [=Connection Allowlist/disposition=].
@@ -513,9 +513,11 @@ to carefully consider how to layer the allowlisting mechanism described here int
 Most saliently, the mechanism is context-specific, not origin-wide. This leaves broad opportunity
 for an attacker with scripting access to bypass a context's allowlist by finding a same-origin
 context with lower restrictions. Integration with HTML's [=policy container=] addresses some of
-those possibilities, but it's likely that others will exist. Allowlisting the document's origin
-(via <a grammar for="Connection-Allowlist">`response-origin`</a> or explicitly), reaching up
-through the frame tree, etc.
+those possibilities, but it's likely that others will exist. An attacker might, for example,
+be able to reach up through the frame tree to a less-restricted parent, or pop open a new window
+via `window.open()` which retains an opener relationship. Allowlisting the document's origin
+(via <a grammar for="Connection-Allowlist">`response-origin`</a> or explicitly), is therefore
+not a complete solution in and of itself.
 
 There are scenarios in which developers can avoid this risk by sandboxing the allowlisted context
 away from its normal origin via <{iframe/sandbox}> attributes or Content Security Policy's
@@ -526,6 +528,37 @@ ISSUE(WICG/connection-allowlists#1): It would also be ideal to give developers c
 their dependencies' allowlists to some extent. An opt-in mechanism rooted in something like
 <a spec="document-policy">required document policy</a> or [[csp-embedded-enforcement]]] might
 be helpful to explore.
+
+
+Service Workers {#security-service-worker}
+---------------
+
+[=Service Workers=] complicate the story around allowlists, just as other same-origin contexts do.
+Because they have a [=/policy container=] distinct from each of the documents they manage, it's
+quite possible for them to respond to messages or requests initiated in documents whose allowlist
+differs from the service worker's allowlist. This proposal follows other policies' design, allowing
+for these differences in capability.
+
+If developers wish to constrain service workers' ability to make requests, they can deliver an
+allowlist along with the worker script, but they'll need to ensure that this allowlist is a superset
+of the allowlists of any document it might service. 
+
+
+DNS {#security-dns}
+---
+
+Connection Allowlists rely on URL matching to determine whether a given endpoint is acceptable. This
+approach, like any other name-based mechanism, can be subverted if the name maps to an unexpected
+server. The allowlist depends on an accurate mapping of [=/hosts=] to servers in order for the
+constraints it imposes to be meaningful.
+
+Developers should mitigate the risk of DNS hijacking and/or rebinding by relying upon authenticated
+connections: allowlisting only secure protocols will make it much more difficult for an attacker in
+control over DNS to shift traffic to an arbitrary endpoint, as the TLS handshake will require
+possession of a certificate with the relevant name.
+
+ISSUE: Should we restrict the allowlist's patterns to those representing secure protocols? Or punt
+the header entirely for non-secure origins?
 
 
 `postMessage(...)` {#security-postmessage}
